@@ -24,4 +24,22 @@ describe('logs-service', () => {
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
+
+  // Test: GET /api/logs should not include MongoDB _id field
+  test('GET /api/logs does not include _id field', async () => {
+    const res = await request(app).get('/api/logs');
+    expect(res.statusCode).toBe(200);
+    if (res.body.length > 0) {
+      expect(res.body[0]).not.toHaveProperty('_id');
+    }
+  });
+
+  // Test: POST /api/logs should accept log entries
+  test('POST /api/logs accepts log entry', async () => {
+    const res = await request(app)
+      .post('/api/logs')
+      .send({ service: 'test-service', type: 'test', message: 'test log' });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty('ok', true);
+  });
 });

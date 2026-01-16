@@ -1,16 +1,20 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 
 /**
- * Log schema for storing HTTP request logs.
- * This schema tracks service requests with method, URL, status code, and timestamp.
+ * Log schema for storing application logs.
+ * This schema is flexible and can store various types of log entries with optional fields.
  */
 const logSchema = new mongoose.Schema(
   {
-    service: { type: String, required: true },      // Name of the service that made the request
-    method: { type: String, required: true },       // HTTP method (GET, POST, etc.)
-    url: { type: String, required: true },           // Request URL/path
-    statusCode: { type: Number, required: true },   // HTTP response status code
-    time: { type: Date, required: true }             // Timestamp of the request
+    ts: { type: Date, required: true },              // Timestamp of the log entry
+    service: { type: String, required: true },        // Name of the service that generated the log
+    type: { type: String, required: true },          // Type of log (e.g., 'request', 'endpoint')
+    method: { type: String },                         // HTTP method (optional, for request logs)
+    path: { type: String },                           // Request path (optional, for request logs)
+    statusCode: { type: Number },                     // HTTP status code (optional, for request logs)
+    responseTimeMs: { type: Number },                 // Response time in milliseconds (optional)
+    message: { type: String },                        // Log message (optional)
+    meta: { type: Object }                            // Additional metadata object (optional)
   },
   { versionKey: false }  // Disable __v version key
 );

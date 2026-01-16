@@ -29,4 +29,24 @@ describe('admin-service', () => {
       expect(res.body[0]).toHaveProperty('last_name');
     }
   });
+
+  // Test: About endpoint should return only first_name and last_name (no extra fields)
+  test('GET /api/about returns only first_name and last_name', async () => {
+    const res = await request(app).get('/api/about');
+    expect(res.statusCode).toBe(200);
+
+    if (res.body.length > 0) {
+      const keys = Object.keys(res.body[0]);
+      expect(keys).toContain('first_name');
+      expect(keys).toContain('last_name');
+      expect(keys.length).toBe(2);
+    }
+  });
+
+  // Test: About endpoint should have at least one team member
+  test('GET /api/about has team members', async () => {
+    const res = await request(app).get('/api/about');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+  });
 });

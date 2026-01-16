@@ -23,6 +23,7 @@ const pinoHttp = require('pino-http');
 // Import Mongoose models
 const Cost = require('./models/cost.model');
 const Report = require('./models/report.model');
+const Log = require('./models/log.model');
 
 const app = express();
 
@@ -34,8 +35,8 @@ app.use(pinoHttp());
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
-    pushLog({
-      ts: new Date().toISOString(),
+    const logDoc = {
+      ts: new Date(),
       service: process.env.SERVICE_NAME,
       type: 'request',
       method: req.method,
@@ -43,7 +44,11 @@ app.use((req, res, next) => {
       statusCode: res.statusCode,
       responseTimeMs: Date.now() - start,
       message: 'request completed'
-    });
+    };
+    // Save log to local MongoDB database
+    new Log(logDoc).save().catch(() => {});
+    // Also send to centralized logs service
+    pushLog(logDoc);
   });
   next();
 });
@@ -107,6 +112,12 @@ app.post('/api/add', async function (req, res) {
 
     if (typeof body.sum !== 'number') {
       return sendError(res, 5, 'sum must be a Number', 400);
+    }
+
+    // Verify that the user exists in the users collection before adding a cost
+    const userExists = await mongoose.connection.collection('users').findOne({ id: body.userid });
+    if (!userExists) {
+      return sendError(res, 8, 'User with this userid does not exist', 400);
     }
 
     // Use current time if createdAt is not provided, otherwise parse the provided date

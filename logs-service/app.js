@@ -61,7 +61,7 @@ app.post('/api/logs', async (req, res) => {
  * Retrieves all log entries from the database, sorted by timestamp (newest first).
  */
 app.get('/api/logs', async (req, res) => {
-  const logs = await Log.find({}).sort({ ts: -1 }).lean();
+  const logs = await Log.find({}, { _id: 0 }).sort({ ts: -1 }).lean();
   res.json(logs);
 });
 
