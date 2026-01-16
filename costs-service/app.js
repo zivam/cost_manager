@@ -1,4 +1,9 @@
-﻿function pushLog(doc) {
+﻿/**
+ * Sends a log document to the logs service asynchronously.
+ * This function fails silently if the logs service is unavailable.
+ * @param {Object} doc - The log document to send
+ */
+function pushLog(doc) {
   try {
     if (!process.env.LOGS_SERVICE_URL) return;
     fetch(process.env.LOGS_SERVICE_URL + '/api/logs', {
@@ -8,18 +13,24 @@
     }).catch(()=>{});
   } catch(e){}
 }
+
+// Load environment variables from .env file
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const pinoHttp = require('pino-http');
 
+// Import Mongoose models
 const Cost = require('./models/cost.model');
 const Report = require('./models/report.model');
 
 const app = express();
 
+// Middleware: Parse JSON request bodies
 app.use(express.json());
+// Middleware: HTTP request logging using pino
 app.use(pinoHttp());
+// Middleware: Track request timing and send logs to logs service
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
@@ -36,12 +47,22 @@ app.use((req, res, next) => {
   });
   next();
 });
+
+/**
+ * Helper function to send standardized error responses.
+ * @param {Object} res - Express response object
+ * @param {number} id - Error ID code
+ * @param {string} message - Error message
+ * @param {number} statusCode - HTTP status code (defaults to 400)
+ */
 function sendError(res, id, message, statusCode) {
   res.status(statusCode || 400).json({ id: id, message: message });
 }
 
+// Valid cost categories that can be used when adding costs
 const ALLOWED_CATEGORIES = ['food', 'health', 'housing', 'sports', 'education'];
 
+// Connect to MongoDB database
 mongoose.connect(process.env.MONGO_URI)
   .then(function () {
     console.log('MongoDB connected (costs-service)');
@@ -50,6 +71,10 @@ mongoose.connect(process.env.MONGO_URI)
     console.log('MongoDB connection error:', err.message);
   });
 
+/**
+ * Health check endpoint.
+ * Returns the service name and status to verify the service is running.
+ */
 app.get('/health', function (req, res) {
   res.json({ service: process.env.SERVICE_NAME, status: 'ok' });
 });
@@ -84,14 +109,17 @@ app.post('/api/add', async function (req, res) {
       return sendError(res, 5, 'sum must be a Number', 400);
     }
 
+    // Use current time if createdAt is not provided, otherwise parse the provided date
     const now = new Date();
     const createdAt = body.createdAt ? new Date(body.createdAt) : now;
 
+    // Validate that the date is valid
     if (isNaN(createdAt.getTime())) {
       return sendError(res, 6, 'createdAt must be a valid Date if provided', 400);
     }
 
-    // Block "past" dates (strict): createdAt < now
+    // Business rule: Block "past" dates (strict): createdAt < now
+    // Server does NOT allow adding costs with dates that belong to the past
     if (createdAt.getTime() < now.getTime()) {
       return sendError(res, 7, 'Cannot add costs with dates in the past', 400);
     }
@@ -116,14 +144,26 @@ app.post('/api/add', async function (req, res) {
   }
 });
 
-/*
-  Helper: Build the report JSON in the required format.
-*/
+/**
+ * Helper function: Build the report JSON in the required format.
+ * Groups costs by category and extracts the day of month for each cost.
+ * @param {number} userid - User ID
+ * @param {number} year - Year for the report
+ * @param {number} month - Month for the report (1-12)
+ * @param {Array} costs - Array of cost documents
+ * @returns {Object} Report object with userid, year, month, and grouped costs
+ */
 function buildReport(userid, year, month, costs) {
+  /**
+   * Extract the day of month from a date.
+   * @param {Date} d - Date object
+   * @returns {number} Day of month (1-31)
+   */
   function dayOfMonth(d) {
     return new Date(d).getDate();
   }
 
+  // Initialize grouped costs object with all allowed categories
   const grouped = {
     food: [],
     education: [],
@@ -132,6 +172,7 @@ function buildReport(userid, year, month, costs) {
     sports: []
   };
 
+  // Group costs by category and extract day of month
   for (let i = 0; i < costs.length; i++) {
     const c = costs[i];
     if (grouped[c.category]) {
@@ -177,9 +218,11 @@ app.get('/api/report', async function (req, res) {
       return sendError(res, 21, 'month must be between 1 and 12', 400);
     }
 
+    // Determine if the requested month is in the past
     const now = new Date();
     const isPastMonth = (year < now.getFullYear()) || (year === now.getFullYear() && month < (now.getMonth() + 1));
 
+    // Computed Design Pattern: If report requested for a past month and cached in DB => return cached
     if (isPastMonth) {
       const cached = await Report.findOne({ userid: userid, year: year, month: month }).lean();
       if (cached && cached.report) {
@@ -187,16 +230,22 @@ app.get('/api/report', async function (req, res) {
       }
     }
 
+    // Calculate the start and end dates for the requested month
+    // Start: first day of the month at 00:00:00
+    // End: first day of the next month at 00:00:00 (exclusive)
     const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
     const end = new Date(year, month, 1, 0, 0, 0, 0);
 
+    // Query all costs for this user within the specified month
     const costs = await Cost.find(
       { userid: userid, createdAt: { $gte: start, $lt: end } },
       { _id: 0, description: 1, category: 1, userid: 1, sum: 1, createdAt: 1 }
     ).lean();
 
+    // Build the report from the costs
     const report = buildReport(userid, year, month, costs);
 
+    // Computed Design Pattern: If past month, save the computed report to cache for future requests
     if (isPastMonth) {
       try {
         await new Report({
@@ -207,7 +256,7 @@ app.get('/api/report', async function (req, res) {
           createdAt: new Date()
         }).save();
       } catch (e) {
-        // ignore duplicate cache
+        // Ignore duplicate cache errors (if report already exists)
       }
     }
 
