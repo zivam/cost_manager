@@ -17,20 +17,33 @@ function pushLog(doc) {
 // Load environment variables from .env file
 require('dotenv').config();
 const express = require('express');
+const mongoose = require('mongoose');
 const pinoHttp = require('pino-http');
 
+// Import Log model for saving logs to database
+const Log = require('./models/log.model');
+
 const app = express();
+
+// Connect to MongoDB database
+mongoose.connect(process.env.MONGO_URI)
+  .then(function () {
+    console.log('MongoDB connected (admin-service)');
+  })
+  .catch(function (err) {
+    console.log('MongoDB connection error:', err.message);
+  });
 
 // Middleware: Parse JSON request bodies
 app.use(express.json());
 // Middleware: HTTP request logging using pino
 app.use(pinoHttp());
-// Middleware: Track request timing and send logs to logs service
+// Middleware: Track request timing and save logs to database
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
-    pushLog({
-      ts: new Date().toISOString(),
+    const logDoc = {
+      ts: new Date(),
       service: process.env.SERVICE_NAME,
       type: 'request',
       method: req.method,
@@ -38,7 +51,11 @@ app.use((req, res, next) => {
       statusCode: res.statusCode,
       responseTimeMs: Date.now() - start,
       message: 'request completed'
-    });
+    };
+    // Save log to local MongoDB database
+    new Log(logDoc).save().catch(() => {});
+    // Also send to centralized logs service
+    pushLog(logDoc);
   });
   next();
 });

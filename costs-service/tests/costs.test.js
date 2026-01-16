@@ -33,4 +33,42 @@ describe('costs-service', () => {
       expect(Array.isArray(res.body.costs)).toBe(true);
     }
   });
+
+  // Test: POST /api/add with missing fields should return error
+  test('POST /api/add with missing fields returns error', async () => {
+    const res = await request(app)
+      .post('/api/add')
+      .send({ description: 'test' });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('message');
+  });
+
+  // Test: POST /api/add with invalid category should return error
+  test('POST /api/add with invalid category returns error', async () => {
+    const res = await request(app)
+      .post('/api/add')
+      .send({ description: 'test', category: 'invalid', userid: 123123, sum: 10 });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('message');
+  });
+
+  // Test: POST /api/add with non-existent user should return error
+  test('POST /api/add with non-existent user returns error', async () => {
+    const res = await request(app)
+      .post('/api/add')
+      .send({ description: 'test', category: 'food', userid: 999999999, sum: 10 });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('message');
+  });
+
+  // Test: GET /api/report with invalid params should return error
+  test('GET /api/report with invalid month returns error', async () => {
+    const res = await request(app).get('/api/report?id=123123&year=2026&month=13');
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('message');
+  });
 });

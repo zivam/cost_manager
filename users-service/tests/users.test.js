@@ -38,4 +38,32 @@ describe('users-service', () => {
       expect(res.body).toHaveProperty('total');
     }
   });
+
+  // Test: POST /api/add with missing fields should return error
+  test('POST /api/add with missing fields returns error', async () => {
+    const res = await request(app)
+      .post('/api/add')
+      .send({ id: 999888 });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('message');
+  });
+
+  // Test: POST /api/add with invalid id type should return error
+  test('POST /api/add with invalid id type returns error', async () => {
+    const res = await request(app)
+      .post('/api/add')
+      .send({ id: 'not-a-number', first_name: 'Test', last_name: 'User', birthday: '2000-01-01' });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('message');
+  });
+
+  // Test: GET /api/users/:id with invalid id should return error
+  test('GET /api/users/invalid returns error', async () => {
+    const res = await request(app).get('/api/users/not-a-number');
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('message');
+  });
 });
