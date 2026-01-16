@@ -70,7 +70,8 @@ app.get('/api/about', function (req, res) {
   try {
     res.json([
       { first_name: 'Ziv', last_name: 'Amsili' },
-      { first_name: 'Oran', last_name: 'Levi' }
+      { first_name: 'Oran', last_name: 'Levi' },
+      { first_name: 'Arad', last_name: 'Levi' }
 
     ]);
   } catch (err) {
